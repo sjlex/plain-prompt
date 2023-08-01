@@ -1,0 +1,63 @@
+ARG DOCKER_IMAGE=debian:bookworm
+ARG OS_VERSION=12
+ARG FISH_VERSION=3.6.1-1
+
+# -----------------------------------------------------------------------------
+# BASE
+# ------------------------------------------------------------------------------
+FROM $DOCKER_IMAGE as base
+
+# Install packages
+RUN apt-get update -qq \
+    && DEBIAN_FRONTEND=noninteractive apt-get install -yq --no-install-recommends \
+        sudo \
+        ca-certificates \
+        gnupg \
+        curl \
+    && apt-get clean \
+    && rm -rf /var/cache/apt/archives/* \
+    && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/* \
+    && truncate -s 0 /var/log/*log
+
+# ------------------------------------------------------------------------------
+# RUNTIME-ENV
+# ------------------------------------------------------------------------------
+FROM base as runtime-env
+
+ARG OS_VERSION
+ARG FISH_VERSION
+
+# Fish repo
+RUN curl -fsSL https://download.opensuse.org/repositories/shells:fish:release:3/Debian_$OS_VERSION/Release.key | \
+    gpg --dearmor -o /usr/share/keyrings/fish.gpg
+RUN chmod a+r /usr/share/keyrings/fish.gpg
+RUN echo \
+    "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/fish.gpg] \
+    http://download.opensuse.org/repositories/shells:/fish:/release:/3/Debian_12/ /" | \
+    tee /etc/apt/sources.list.d/shells:fish:release:3.list > /dev/null
+
+# Install packages
+RUN apt-get update -qq \
+    && DEBIAN_FRONTEND=noninteractive apt-get install -yq --no-install-recommends \
+        fish=$FISH_VERSION \
+    && apt-get clean \
+    && rm -rf /var/cache/apt/archives/* \
+    && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/* \
+    && truncate -s 0 /var/log/*log
+
+# Install taskfile
+RUN sh -c "$(curl --location https://taskfile.dev/install.sh)" -- -d -b /usr/bin
+
+# Install fisher
+RUN fish -c "curl -sL https://raw.githubusercontent.com/jorgebucaran/fisher/main/functions/fisher.fish | source && \
+    fisher install jorgebucaran/fisher"
+
+# ------------------------------------------------------------------------------
+# RUNTIME
+# ------------------------------------------------------------------------------
+FROM runtime-env as runtime
+MAINTAINER Sergei Aleksandrov <sergei.a.aleks@gmail.com>
+
+WORKDIR /usr/src
+
+ENTRYPOINT ["/usr/bin/fish"]

@@ -1,0 +1,61 @@
+version: '3'
+
+vars:
+  VERSION: '1.0.0'
+  DOCKER_IMAGE: 'plain-prompt:{{.VERSION}}'
+
+tasks:
+
+  # ----------------------------------------------------------------------------
+  # Default
+  # ----------------------------------------------------------------------------
+  default:
+    desc: "Show all tasks"
+    cmds:
+      - ./bin/task --list-all
+
+  # ----------------------------------------------------------------------------
+  # Install / Remove
+  # ----------------------------------------------------------------------------
+
+  "install":
+    desc: "Install prompt"
+    cmds:
+      - fish -c "fisher install {{.CLI_ARGS | default "."}}"
+
+  "remove":
+    desc: "Remove prompt"
+    cmds:
+      - fish -c "fisher remove {{.CLI_ARGS | default "."}}"
+
+  # ----------------------------------------------------------------------------
+  # Docker
+  # ----------------------------------------------------------------------------
+
+  "docker:run":
+    desc: "Run docker container"
+    cmds:
+      - task: "docker:container:run:shell"
+
+  "docker:build":
+    desc: "Build docker image"
+    cmds:
+      - task: "docker:image:build"
+
+  "docker:image:build":
+    desc: "Build docker image"
+    cmds:
+      - docker buildx build
+        -t {{.DOCKER_IMAGE}}
+        -f Dockerfile.dev
+        {{.ROOT_DIR}}
+        {{.CLI_ARGS}}
+
+  "docker:container:run:shell":
+    desc: "Run docker container"
+    cmds:
+      - docker run -it --rm
+        -v {{.ROOT_DIR}}:/usr/src
+        -w /usr/src
+        {{.DOCKER_IMAGE}}
+        {{.CLI_ARGS}} || true
